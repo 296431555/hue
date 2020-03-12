@@ -301,8 +301,7 @@ class TestUserProfile(BaseUserAdminTests):
 
 class TestUserAdminMetrics(BaseUserAdminTests):
 
-  @override_settings(AUTHENTICATION_BACKENDS=['desktop.auth.backend.AllowFirstUserDjangoBackend'])
-  def test_active_users(self):
+  def setUp(self):
     with patch('useradmin.middleware.get_localhost_name') as get_hostname:
       get_hostname.return_value = 'host1'
 
@@ -327,6 +326,8 @@ class TestUserAdminMetrics(BaseUserAdminTests):
       userprofile3.hostname = 'host2'
       userprofile3.save()
 
+  @override_settings(AUTHENTICATION_BACKENDS=['desktop.auth.backend.AllowFirstUserDjangoBackend'])
+  def test_active_users(self):
     with patch('useradmin.metrics.get_localhost_name') as get_hostname:
       get_hostname.return_value = 'host1'
       assert_equal(3, active_users())
@@ -338,6 +339,19 @@ class TestUserAdminMetrics(BaseUserAdminTests):
       metric = json.loads(response.content)['metric']
       assert_equal(3, metric['users.active']['value'])
       assert_equal(2, metric['users.active.instance']['value'])
+
+  @override_settings(AUTHENTICATION_BACKENDS=['desktop.auth.backend.AllowFirstUserDjangoBackend'])
+  def test_active_users_prometheus(self):
+    finish = desktop.conf.ENABLE_PROMETHEUS.set_for_testing(True)
+    try:
+      with patch('useradmin.metrics.get_localhost_name') as get_hostname:
+        get_hostname.return_value = 'host1'
+        c = Client()
+        response = c.get('/metrics')
+        assert_true(b'hue_active_users 3.0' in response.content)
+        assert_true(b'hue_local_active_users 2.0' in response.content)
+    finally:
+      finish()
 
 
 class TestUserAdmin(BaseUserAdminTests):
